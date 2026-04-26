@@ -3,6 +3,10 @@ init:
 	@echo "> init git commit template..."
 	git config --local commit.template ./.commit_template
 
+.PHONY: certs
+certs:
+	@./scripts/gen-certs.sh
+
 .PHONY: fmt
 fmt:
 	@echo "> format source code..."

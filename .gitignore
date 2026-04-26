@@ -23,3 +23,10 @@ go.work.sum
 
 # env file
 .env
+
+# tutorial で gen-certs.sh が生成する証明書/鍵 (機密)
+*.key
+*.crt
+*.csr
+*.pem
+*.srl

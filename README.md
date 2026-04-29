@@ -19,7 +19,8 @@ Go の `net` / `crypto/tls` / `crypto/x509` パッケージだけを使い、**�
 │   ├── 01-tcpdump.md              #   tcpdump の基本的な使い方
 │   ├── 02-x509-and-ca.md          #   X.509 と CA の仕組み
 │   ├── 03-openssl.md              #   openssl コマンドの基本的な使い方
-│   └── 04-certificate-flow.md     #   CA・署名・証明書の発行フロー
+│   ├── 04-certificate-flow.md     #   CA・署名・証明書の発行フロー
+│   └── 05-tls-versions.md         #   TLS 1.2 と TLS 1.3 のフロー比較
 ├── scripts/
 │   ├── gen-certs.sh               # CA・サーバー・クライアント証明書を一括生成
 │   └── README.md                  # スクリプトの詳細説明
@@ -71,3 +72,4 @@ make certs
 | [02-x509-and-ca.md](docs/02-x509-and-ca.md) | X.509 証明書と CA の仕組み |
 | [03-openssl.md](docs/03-openssl.md) | openssl コマンドの基本的な使い方 |
 | [04-certificate-flow.md](docs/04-certificate-flow.md) | CA・デジタル署名・証明書の発行フロー |
+| [05-tls-versions.md](docs/05-tls-versions.md) | TLS 1.2 と 1.3 のハンドシェイクフロー比較 |

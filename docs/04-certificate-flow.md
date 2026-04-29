@@ -50,3 +50,54 @@ CAは依頼主が本当にそのドメインの所有者であるかを確認し
 2.  **信頼のチェーン確認**: クライアントは、送られてきた証明書の「発行者（Issuer）」を確認します。
 3.  **署名の検証**: クライアントのOSに入っている**「CAの公開鍵」**を使って証明書のデジタル署名を復号・検証します。
 4.  **通信の開始**: 検証が成功（改ざんがなく、信頼できるCAによる発行だと確認できた）すれば、証明書に含まれる「サーバーの公開鍵」を使って暗号化通信の土台作りへ進みます。
+
+---
+
+## 4. OpenSSLコマンドによる実装例
+
+上記のフローを、ローカル開発環境で `openssl` コマンドを使って再現する手順です（本リポジトリの証明書生成スクリプトが行っている処理とほぼ同じです）。
+
+### 事前準備：CA（認証局）自身の設立
+まずは署名を行う「大元のCA」を作り、CA自身の秘密鍵と公開鍵（ルート証明書）を用意します。
+
+```bash
+# 1. CAの秘密鍵を作成
+openssl genrsa -out ca.key 2048
+
+# 2. CAのルート証明書を作成（自分自身で署名＝自己署名）
+openssl req -x509 -new -nodes -key ca.key -sha256 -days 3650 -out ca.crt -subj "/CN=My Root CA"
+```
+
+### フェーズ1：証明書の発行依頼（サーバー運営者）
+サーバー運営者が自分の鍵を作り、CAに「証明書を作ってください」とお願いする（CSRを作る）フェーズです。
+
+```bash
+# 1. サーバーの秘密鍵を作成
+openssl genrsa -out server.key 2048
+
+# 2. CSR（証明書署名要求）を作成
+openssl req -new -key server.key -out server.csr -subj "/CN=localhost"
+```
+
+### フェーズ2：CAによる審査と署名（CA）
+CAが受け取ったCSR（`server.csr`）に対して、CAの秘密鍵（`ca.key`）を使ってハンコを押し、サーバー証明書を発行します。
+
+```bash
+# CAがCSRに署名し、サーバー証明書（server.crt）を発行する
+openssl x509 -req -in server.csr \
+    -CA ca.crt -CAkey ca.key -CAcreateserial \
+    -out server.crt -days 365 -sha256
+```
+
+### フェーズ3：通信時の証明書の提示と検証（クライアント）
+クライアントが、サーバーから渡された証明書を、手元にあるCAの公開鍵を使って検証するフェーズです。
+
+```bash
+# CAの公開鍵（ca.crt）を使って、server.crt が本物か検証する
+openssl verify -CAfile ca.crt server.crt
+```
+
+**成功した場合の出力:**
+```text
+server.crt: OK
+```

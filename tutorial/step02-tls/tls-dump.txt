@@ -1,0 +1,38 @@
+// TCP 3-way handshake
+10:53:55.192049 IP6 localhost.59679 > localhost.tungsten-https: Flags [S], seq 4043892891, win 65535, options [mss 16324,nop,wscale 6,nop,nop,TS val 3844531333 ecr 0,sackOK,eol], length 0
+10:53:55.192090 IP6 localhost.tungsten-https > localhost.59679: Flags [S.], seq 2814785228, ack 4043892892, win 65535, options [mss 16324,nop,wscale 6,nop,nop,TS val 3883135403 ecr 3844531333,sackOK,eol], length 0
+10:53:55.192102 IP6 localhost.59679 > localhost.tungsten-https: Flags [.], ack 1, win 6372, options [nop,nop,TS val 3844531333 ecr 3883135403], length 0
+// ...
+10:53:55.192109 IP6 localhost.tungsten-https > localhost.59679: Flags [.], ack 1, win 6372, options [nop,nop,TS val 3883135403 ecr 3844531333], length 0
+
+// TLS handshake
+// client -> server: ClientHello
+10:53:55.192992 IP6 localhost.59679 > localhost.tungsten-https: Flags [P.], seq 1:1502, ack 1, win 6372, options [nop,nop,TS val 3844531333 ecr 3883135403], length 1501
+10:53:55.193028 IP6 localhost.tungsten-https > localhost.59679: Flags [.], ack 1502, win 6349, options [nop,nop,TS val 3883135403 ecr 3844531333], length 0
+
+// server -> client: ServerHello
+10:53:55.196766 IP6 localhost.tungsten-https > localhost.59679: Flags [P.], seq 1:2743, ack 1502, win 6349, options [nop,nop,TS val 3883135407 ecr 3844531333], length 2742
+10:53:55.196785 IP6 localhost.59679 > localhost.tungsten-https: Flags [.], ack 2743, win 6330, options [nop,nop,TS val 3844531337 ecr 3883135407], length 0
+
+// client -> server: EncryptedExtensions + Certificate + CertificateVerify + Finished
+10:53:55.197753 IP6 localhost.59679 > localhost.tungsten-https: Flags [P.], seq 1502:1566, ack 2743, win 6330, options [nop,nop,TS val 3844531338 ecr 3883135407], length 64
+10:53:55.197766 IP6 localhost.tungsten-https > localhost.59679: Flags [.], ack 1566, win 6348, options [nop,nop,TS val 3883135408 ecr 3844531338], length 0
+
+// client -> server: AppData
+10:54:06.111060 IP6 localhost.59679 > localhost.tungsten-https: Flags [P.], seq 1566:1595, ack 2743, win 6330, options [nop,nop,TS val 3844542252 ecr 3883135408], length 29
+10:54:06.111094 IP6 localhost.tungsten-https > localhost.59679: Flags [.], ack 1595, win 6348, options [nop,nop,TS val 3883146322 ecr 3844542252], length 0
+
+// server -> client: AppData
+10:54:06.111251 IP6 localhost.tungsten-https > localhost.59679: Flags [P.], seq 2743:2778, ack 1595, win 6348, options [nop,nop,TS val 3883146322 ecr 3844542252], length 35
+10:54:06.111264 IP6 localhost.59679 > localhost.tungsten-https: Flags [.], ack 2778, win 6330, options [nop,nop,TS val 3844542252 ecr 3883146322], length 0
+
+// TLS Finished + AppData (client -> server)
+10:54:08.093058 IP6 localhost.59679 > localhost.tungsten-https: Flags [P.], seq 1595:1619, ack 2778, win 6330, options [nop,nop,TS val 3844544234 ecr 3883146322], length 24
+10:54:08.093089 IP6 localhost.tungsten-https > localhost.59679: Flags [.], ack 1619, win 6348, options [nop,nop,TS val 3883148304 ecr 3844544234], length 0
+
+// TCP 4-way handshake (FIN)
+10:54:08.093176 IP6 localhost.59679 > localhost.tungsten-https: Flags [F.], seq 1619, ack 2778, win 6330, options [nop,nop,TS val 3844544234 ecr 3883148304], length 0
+10:54:08.093186 IP6 localhost.tungsten-https > localhost.59679: Flags [P.], seq 2778:2802, ack 1619, win 6348, options [nop,nop,TS val 3883148304 ecr 3844544234], length 24
+10:54:08.093194 IP6 localhost.tungsten-https > localhost.59679: Flags [.], ack 1620, win 6348, options [nop,nop,TS val 3883148304 ecr 3844544234], length 0
+10:54:08.093207 IP6 localhost.tungsten-https > localhost.59679: Flags [F.], seq 2802, ack 1620, win 6348, options [nop,nop,TS val 3883148304 ecr 3844544234], length 0
+10:54:08.093213 IP6 localhost.59679 > localhost.tungsten-https: Flags [R], seq 4043894510, win 0, length 0

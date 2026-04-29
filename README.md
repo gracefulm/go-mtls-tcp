@@ -1,44 +1,73 @@
-# Go Template Project
+# Go mTLS TCP チュートリアル
 
-> [!IMPORTANT]
->
-> - このプロジェクトは、[project-layout](https://github.com/golang-standards/project-layout/blob/master/README_ja.md)を参考にしています。
->   - project-layoutはGoの公式のプロジェクトのレイアウトではないことに注意してください。
->   - Goの公式のプロジェクト構成は[こちら](https://go.dev/doc/modules/layout)を参考にしてください。
-> - 実際に使用する時は必要なディレクトリのみ残してスモールスタートで開発してください。
->   - 特に、簡単なコマンドのみで構成されるプロジェクトではフラットにして開発するのが良いです。
+Go の `net` / `crypto/tls` / `crypto/x509` パッケージだけを使い、**素の TCP → TLS（サーバー認証） → mTLS（相互認証）** と段階的にエコーサーバー/クライアントを進化させるハンズオン教材です。
+
+## 学べること
+
+| Step | テーマ | 解決される脅威 |
+|---|---|---|
+| [Step 01](tutorial/step01-tcp-echo/README.md) | 素の TCP エコー | — |
+| [Step 02](tutorial/step02-tls/README.md) | TLS（サーバー認証のみ） | 盗聴・改ざん・サーバーのなりすまし |
+| [Step 03](tutorial/step03-mtls/README.md) | mTLS（相互認証） | クライアントのなりすまし |
 
 ## プロジェクトの構成
 
 ```txt
 .
-├── api/                 # APIの定義(Swagger/Protocol Buffers etc...)
-├── assets/              # アセット(画像/音声 etc...)
-├── build/               # ビルド/テスト/デプロイのためのツール
-├── cmd/                 # ソースコードのエントリポイント
-├── configs/             # 設定ファイル
-├── deployments/         # IaaS、PaaS、システム、コンテナオーケストレーションのデプロイメント設定とテンプレート
-├── docs/                # デザインドキュメントとユーザードキュメント
-├── examples/            # サンプルコード
-├── githooks/            # Gitのフックスクリプト
-├── go.mod               # Goのモジュール定義
-├── init/                # システムinit(systemd, upstart, sysv)とプロセスマネージャ/スーパーバイザ(runit, supervisord)の設定
-├── internal/            # 内部のパッケージ
-├── LICENSE              # ライセンス
-├── Makefile             # Makefile
-├── pkg/                 # 公開パッケージ
-├── README.md            # プロジェクトの説明
-├── scripts/             # スクリプト類
-├── test/                # 追加の外部テストアプリとテストデータ
-├── third_party/         # 外部ヘルパーツール
-├── tools/               # このプロジェクトをサポートするツール類
-├── vender/              # アプリケーションの依存関係(go mod vendorコマンドで生成される、基本的に使わない)
-├── web/                 # ウェブアプリケーション固有のコンポーネント(SPAなど)
-└── website/             # プロジェクトのウェブサイト置き場
+├── docs/                          # 補助ドキュメント
+│   ├── 00-overview.md             #   全体マップ・用語集
+│   ├── 01-tcpdump.md              #   tcpdump の基本的な使い方
+│   ├── 02-x509-and-ca.md          #   X.509 と CA の仕組み
+│   ├── 03-openssl.md              #   openssl コマンドの基本的な使い方
+│   └── 04-certificate-flow.md     #   CA・署名・証明書の発行フロー
+├── scripts/
+│   ├── gen-certs.sh               # CA・サーバー・クライアント証明書を一括生成
+│   └── README.md                  # スクリプトの詳細説明
+├── tutorial/
+│   ├── step01-tcp-echo/           # Step 01: 素の TCP
+│   │   ├── server/main.go
+│   │   ├── client/main.go
+│   │   └── README.md
+│   ├── step02-tls/                # Step 02: TLS (サーバー認証のみ)
+│   │   ├── server/main.go
+│   │   ├── client/main.go
+│   │   ├── certs/                 #   make certs で生成される証明書
+│   │   └── README.md
+│   └── step03-mtls/               # Step 03: mTLS (相互認証)
+│       ├── server/main.go
+│       ├── client/main.go
+│       ├── certs/                 #   make certs で生成される証明書
+│       └── README.md
+├── go.mod
+├── Makefile
+└── README.md
 ```
 
-## Setup
+## セットアップ
 
 ```bash
+# Git のコミットテンプレートを設定
 make init
+
+# Step 02 / 03 に必要な証明書を生成
+make certs
 ```
+
+## 進め方
+
+1. `make certs` で証明書を生成します（Step 02 以降で必要）。
+2. `tutorial/` 内の各ステップを **Step 01 → 02 → 03** の順に進めてください。
+3. 各ステップの `README.md` に、動かし方・観察ポイント・実験課題が書いてあります。
+4. `tcpdump` や Wireshark でパケットを観察すると、各ステップの違いをより深く理解できます。
+
+詳細は [docs/00-overview.md](docs/00-overview.md) を参照してください。
+
+## 補助ドキュメント
+
+| ドキュメント | 内容 |
+|---|---|
+| [00-overview.md](docs/00-overview.md) | 全体マップ・用語集・発展トピック |
+| [01-tcpdump.md](docs/01-tcpdump.md) | tcpdump の基本的な使い方 |
+| [02-x509-and-ca.md](docs/02-x509-and-ca.md) | X.509 証明書と CA の仕組み |
+| [03-openssl.md](docs/03-openssl.md) | openssl コマンドの基本的な使い方 |
+| [04-certificate-flow.md](docs/04-certificate-flow.md) | CA・デジタル署名・証明書の発行フロー |

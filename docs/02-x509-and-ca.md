@@ -8,13 +8,52 @@
 
 X.509証明書は、例えるなら**「インターネット上の運転免許証やパスポート」**です。「サーバーの公開鍵」と「そのサーバーの身元情報」を紐づけ、信頼できる第三者がハンコ（デジタル署名）を押した構造になっています。
 
-### X.509証明書の主要な内容
-* **Subject（主体者）**: この証明書の持ち主。（例: `CN=example.com` など）
-* **Issuer（発行者）**: この証明書を発行し、身元を保証した認証局（CA）。
-* **Public Key（公開鍵）**: 持ち主の公開鍵データ。クライアントはこれを使って暗号化通信の土台を作ります。
-* **Validity（有効期間）**: この証明書がいつからいつまで有効か（Not Before / Not After）。
-* **SAN (Subject Alternative Name)**: この証明書が有効なドメイン名やIPアドレスのリスト。**現在のTLSではホスト名の検証に最も重要視される項目**です。
-* **Signature（署名）**: 発行者（CA）によるデジタル署名。証明書が改ざんされていないことの証明になります。
+### X.509証明書の各フィールド詳解
+
+`openssl x509 -in server.crt -text -noout` を実行すると、証明書の中身がテキストとして確認できます。各フィールドの意味は以下の通りです。
+
+#### 基本フィールド
+
+| フィールド | 出力例 | 意味 |
+|---|---|---|
+| `Version` | `3 (0x2)` | X.509のバージョン。現代のTLSでは常に **v3** が使われる（v3から拡張フィールドが使えるようになった） |
+| `Serial Number` | `4a:5d:97:c6:...` | CAが発行時に採番する証明書のユニークID。失効リスト（CRL）での照合に使われる |
+| `Signature Algorithm` | `sha256WithRSAEncryption` | CAがどのアルゴリズムで署名したか。SHA-256でハッシュ → RSA秘密鍵で暗号化 |
+| `Issuer` | `CN=go-mtls-tutorial Root CA` | **この証明書を発行したCA**の名前。クライアントはこれを手がかりに信頼チェーンを辿る |
+| `Not Before / Not After` | `Apr 26 2026 〜 Jul 29 2028` | 証明書の有効期限。期限切れの証明書はTLSハンドシェイクで拒否される |
+| `Subject` | `CN=localhost` | **この証明書の持ち主**（サーバー）の名前 |
+
+#### Subject Public Key Info（公開鍵）
+
+```
+Public Key Algorithm: rsaEncryption
+Public-Key: (2048 bit)
+Modulus: 00:a5:87:96:...
+Exponent: 65537 (0x10001)
+```
+
+サーバーの**公開鍵**本体です。TLSハンドシェイク時にクライアントへ送られ、鍵交換に使われます。`Modulus`（係数）と `Exponent`（指数）の2つの数値がRSA公開鍵を構成しています。対になる**秘密鍵（`server.key`）はサーバーだけが保管**しており、外部に渡しても問題ない公開情報です。
+
+#### X509v3 拡張フィールド
+
+v3から追加された拡張領域で、証明書の用途や信頼の関係を細かく制御できます。
+
+| 拡張フィールド | 出力例 | 意味 |
+|---|---|---|
+| `Authority Key Identifier` | `F8:DF:46:14:...` | **発行したCAの識別子**。`ca.crt` の `Subject Key Identifier` と一致する。信頼チェーンを辿るための手がかり |
+| `Basic Constraints` | `CA:FALSE` | **CAとして振る舞えるか**。`CA:FALSE` = 他の証明書に署名できないエンドエンティティ証明書。`CA:TRUE` = CA証明書（`ca.crt` がこちら） |
+| `Key Usage` | `Digital Signature, Key Encipherment` | この証明書の鍵が**何の操作に使えるか**のビットフラグ |
+| `Extended Key Usage` | `TLS Web Server Authentication` | より具体的な用途。`serverAuth` = TLSサーバー用、`clientAuth` = TLSクライアント用（mTLSで重要） |
+| `Subject Alternative Name` | `DNS:localhost, IP Address:127.0.0.1` | **GoクライアントのSAN検証がここを見る**最重要フィールド。`tls.Config.ServerName` と照合される。Go 1.15以降、`CN` は見ない |
+| `Subject Key Identifier` | `8A:71:95:DB:...` | この証明書自身の識別子。他の証明書の `Authority Key Identifier` から参照される |
+
+#### Signature Value
+
+```
+25:30:dc:a2:70:54:b3:53:...（512バイト）
+```
+
+CAの秘密鍵で署名されたデータ（上記すべてのフィールドのハッシュ値を暗号化したもの）です。`openssl verify -CAfile ca.crt server.crt` は、まさにこの値をCAの公開鍵で復号・検証しています。
 
 ---
 

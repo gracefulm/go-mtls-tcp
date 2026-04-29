@@ -1,0 +1,45 @@
+// TCP 3-way handshake
+19:18:45.565372 IP6 localhost.64223 > localhost.9444: Flags [S], seq 405165854, win 65535, options [mss 16324,nop,wscale 6,nop,nop,TS val 4264963290 ecr 0,sackOK,eol], length 0
+19:18:45.565430 IP6 localhost.9444 > localhost.64223: Flags [S.], seq 623914069, ack 405165855, win 65535, options [mss 16324,nop,wscale 6,nop,nop,TS val 1858686172 ecr 4264963290,sackOK,eol], length 0
+19:18:45.565450 IP6 localhost.64223 > localhost.9444: Flags [.], ack 1, win 6372, options [nop,nop,TS val 4264963290 ecr 1858686172], length 0
+19:18:45.565460 IP6 localhost.9444 > localhost.64223: Flags [.], ack 1, win 6372, options [nop,nop,TS val 1858686172 ecr 4264963290], length 0
+
+// TLS handshake
+// client -> server: ClientHello (length 1501 / Step02 と同じサイズ)
+19:18:45.565970 IP6 localhost.64223 > localhost.9444: Flags [P.], seq 1:1502, ack 1, win 6372, options [nop,nop,TS val 4264963291 ecr 1858686172], length 1501
+19:18:45.565995 IP6 localhost.9444 > localhost.64223: Flags [.], ack 1502, win 6349, options [nop,nop,TS val 1858686173 ecr 4264963291], length 0
+
+// server -> client: ServerHello + Certificate + CertificateRequest
+// length 2874 (Step02 の 2742 より大きい)
+// 差分の約 130 バイトが mTLS 特有の CertificateRequest メッセージ
+// = サーバーが「お前のクライアント証明書を見せろ」と要求している
+19:18:45.568524 IP6 localhost.9444 > localhost.64223: Flags [P.], seq 1:2875, ack 1502, win 6349, options [nop,nop,TS val 1858686175 ecr 4264963291], length 2874
+19:18:45.568564 IP6 localhost.64223 > localhost.9444: Flags [.], ack 2875, win 6328, options [nop,nop,TS val 4264963293 ecr 1858686175], length 0
+
+// client -> server: Certificate (クライアント証明書) + CertificateVerify + Finished
+// length 1500 ← ここが Step02 との最大の違い！
+// Step02 では Finished だけで 64 バイトだったが、
+// mTLS ではクライアント証明書 (client.crt) と、
+// その証明書の秘密鍵で署名した CertificateVerify が追加されるため約 1500 バイトになる
+19:18:45.571189 IP6 localhost.64223 > localhost.9444: Flags [P.], seq 1502:3002, ack 2875, win 6328, options [nop,nop,TS val 4264963296 ecr 1858686175], length 1500
+19:18:45.571238 IP6 localhost.9444 > localhost.64223: Flags [.], ack 3002, win 6326, options [nop,nop,TS val 1858686178 ecr 4264963296], length 0
+
+// client -> server: AppData (暗号化済みアプリケーションデータ)
+// 約1分30秒後に送信 (ユーザーがターミナルに入力した "hello" など)
+19:20:15.251220 IP6 localhost.64223 > localhost.9444: Flags [P.], seq 3002:3027, ack 2875, win 6328, options [nop,nop,TS val 4265052976 ecr 1858761184], length 25
+19:20:15.251258 IP6 localhost.9444 > localhost.64223: Flags [.], ack 3027, win 6326, options [nop,nop,TS val 1858775858 ecr 4265052976], length 0
+
+// server -> client: AppData (暗号化済み echo 返答)
+19:20:15.251428 IP6 localhost.9444 > localhost.64223: Flags [P.], seq 2875:2935, ack 3027, win 6326, options [nop,nop,TS val 1858775858 ecr 4265052976], length 60
+19:20:15.251446 IP6 localhost.64223 > localhost.9444: Flags [.], ack 2935, win 6328, options [nop,nop,TS val 4265052976 ecr 1858775858], length 0
+
+// TLS close_notify + TCP 4-way handshake (切断)
+// client -> server: TLS close_notify (FIN と同時に送信)
+19:20:24.063274 IP6 localhost.64223 > localhost.9444: Flags [F.], seq 3027, ack 2935, win 6328, options [nop,nop,TS val 4265061788 ecr 1858775858], length 0
+19:20:24.063370 IP6 localhost.9444 > localhost.64223: Flags [.], ack 3028, win 6326, options [nop,nop,TS val 1858784670 ecr 4265061788], length 0
+// server -> client: TLS close_notify
+19:20:24.063649 IP6 localhost.9444 > localhost.64223: Flags [P.], seq 2935:2959, ack 3028, win 6326, options [nop,nop,TS val 1858784670 ecr 4265061788], length 24
+// server -> client: FIN
+19:20:24.063736 IP6 localhost.9444 > localhost.64223: Flags [F.], seq 2959, ack 3028, win 6326, options [nop,nop,TS val 1858784670 ecr 4265061788], length 0
+// client -> server: RST (コネクション完全破棄)
+19:20:24.063739 IP6 localhost.64223 > localhost.9444: Flags [R], seq 405168882, win 0, length 0

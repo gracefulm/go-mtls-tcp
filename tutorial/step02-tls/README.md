@@ -71,14 +71,42 @@ echo: hello
 
 クライアント側で `RootCAs` を渡さない (`pool` の設定をコメントアウト) と、`x509: certificate signed by unknown authority` で失敗します。OS の信頼ストアにも我々のオレオレ CA は入っていないからです。
 
-### 3. Step01 のクライアントは喋れない
+### 3. Step01 のクライアントは喋れない（平文 TCP は TLS サーバーに通らない）
 
+TLS サーバーに TLS 非対応のクライアントが繋いでも、**平文 TCP にフォールバックされることはありません**。
+
+実際に試してみましょう。
+
+**ターミナル A**（Step02 サーバーを起動）
 ```bash
-# Step02 のサーバーが起動している状態で
-go run ./tutorial/step01-tcp-echo/client
+go run ./tutorial/step02-tls/server
 ```
 
-これは TCP を `Dial` した直後にいきなり平文を送りつけるので、サーバー側は TLS の `ClientHello` を期待していて噛み合わずエラーで切断されます。
+**ターミナル B**（Step01 クライアントをポート 9443 に向けて接続）
+```bash
+# Step01 クライアントのポートを一時的に 9443 に変えて実行するか、
+# 以下のスクリプトで動作を確認できる
+go run ./tutorial/step01-tcp-echo/client
+# => 9000番ポートに繋ごうとするのでサーバーが起動していなければ失敗
+```
+
+Step01 クライアントのアドレスを `localhost:9443` に変えて実行すると、以下のような結果になります。
+
+```
+TCP connected to localhost:9443        ← TCP 接続は成功する
+sent: hello from plaintext client      ← 平文データを送れる
+connection closed by server            ← サーバーが即座に切断する
+```
+
+**なぜ切断されるか**:
+
+1. TCP 3-way ハンドシェイクは成功するため、TCP レベルでは接続できます
+2. `tls.Listen` で待っているサーバーは、接続後に受け取る最初のバイト列が **TLS の `ClientHello`** であることを期待します
+3. 平文の `hello\n` が来た瞬間に「これは TLS ではない」と判断し、コネクションを切断します
+4. サーバー側のログには `tls: first record does not look like a TLS handshake` というエラーが記録されます
+
+> これは意図的な設計です。「TLS ポートで平文を受け入れてしまう」という脆弱性を防ぐため、TLS サーバーは TLS 以外の通信を一切受け付けません。ブラウザで `https://` のサイトにポート 443 で `http://` として繋ごうとしたときに接続が切られるのと同じ仕組みです。
+
 
 ### 4. openssl でも検証してみる
 

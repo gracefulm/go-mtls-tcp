@@ -1,0 +1,18 @@
+{{- $dest := .Destination -}}
+{{- $isExternal := or (hasPrefix $dest "http://") (hasPrefix $dest "https://") (hasPrefix $dest "mailto:") (hasPrefix $dest "tel:") (hasPrefix $dest "//") -}}
+{{- $isAnchor := hasPrefix $dest "#" -}}
+{{- if not (or $isExternal $isAnchor) -}}
+  {{- $anchor := "" -}}
+  {{- if strings.Contains $dest "#" -}}
+    {{- $parts := split $dest "#" -}}
+    {{- $dest = index $parts 0 -}}
+    {{- $anchor = printf "#%s" (index $parts 1) -}}
+  {{- end -}}
+  {{- if hasSuffix $dest "README.md" -}}
+    {{- $dest = strings.TrimSuffix "README.md" $dest -}}
+  {{- else if hasSuffix $dest ".md" -}}
+    {{- $dest = printf "%s/" (strings.TrimSuffix ".md" $dest) -}}
+  {{- end -}}
+  {{- $dest = printf "%s%s" $dest $anchor -}}
+{{- end -}}
+<a href="{{ $dest | safeURL }}"{{ with .Title }} title="{{ . }}"{{ end }}{{ if $isExternal }} target="_blank" rel="noopener"{{ end }}>{{ .Text | safeHTML }}</a>

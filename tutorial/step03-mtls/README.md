@@ -45,14 +45,17 @@ hello alice@example.com, you said: hi
 
 Step02 のハンドシェイクに、サーバーからの `CertificateRequest` と、クライアントからの `Certificate` + `CertificateVerify` (秘密鍵で署名) が増えます。
 
-```
-Client                                  Server
-  |--- ClientHello ----------------------->|
-  |<-- ServerHello, Certificate -----------|
-  |<-- CertificateRequest -----------------| ← Step03 から追加
-  |--- Certificate, CertificateVerify ---->| ← Step03 から追加
-  |--- (鍵交換) -------------------------->|
-  |<== 暗号化セッション ===================|
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant S as Server
+
+    C->>S: ClientHello
+    S->>C: ServerHello, Certificate
+    S->>C: CertificateRequest ※ Step03 から追加
+    C->>S: Certificate, CertificateVerify ※ Step03 から追加
+    C->>S: (鍵交換)
+    Note over C,S: 暗号化セッション確立
 ```
 
 サーバーは:
@@ -147,6 +150,10 @@ if peerCN != "alice@example.com" {
 ```
 
 これだけで「特定のクライアントだけ受け付ける」サーバーになります。**実運用では CN ではなく SAN (URI SAN や DNS SAN)** を見るのが一般的です — CN は人間向けの表示名で、運用で書き換えられがちなため。
+
+## パケットダンプ
+
+`tcpdump` で実際に観測した本ステップのハンドシェイクを [`mtls-dump.txt`](mtls-dump.txt) に置いてあります。Step02 との差分として、サーバーから `CertificateRequest` が飛び、クライアントが自分の証明書 + `CertificateVerify` を返している様子を確認できます。
 
 ## 用語ミニまとめ
 

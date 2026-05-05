@@ -1,0 +1,123 @@
+baseURL = "/"
+title = "Go mTLS TCP チュートリアル"
+defaultContentLanguage = "ja"
+enableEmoji = true
+enableGitInfo = false
+enableRobotsTXT = true
+enableInlineShortcodes = true
+
+[languages]
+  [languages.ja]
+    label = "日本語"
+    locale = "ja"
+    weight = 1
+
+[markup]
+  [markup.goldmark.renderer]
+    unsafe = true
+  [markup.tableOfContents]
+    startLevel = 2
+    endLevel = 4
+  [markup.highlight]
+    noClasses = false
+
+[params]
+  description = "Go の net / crypto/tls / crypto/x509 だけで、素の TCP → TLS → mTLS → Envoy sidecar と段階的に進化させるハンズオン教材"
+
+  [params.navbar]
+    displayTitle = true
+    displayLogo = false
+
+  [params.theme]
+    default = "system"
+    displayToggle = true
+
+  [params.search]
+    enable = true
+    type = "flexsearch"
+    [params.search.flexsearch]
+      index = "content"
+
+  [params.editURL]
+    enable = true
+    base = "https://github.com/gracefulm/go-mtls-tcp/edit/main"
+
+  [params.toc]
+    displayTags = true
+
+  [params.footer]
+    enable = true
+    displayCopyright = false
+    displayPoweredBy = true
+
+[[menu.main]]
+  identifier = "tutorial"
+  name = "チュートリアル"
+  pageRef = "/tutorial"
+  weight = 1
+
+[[menu.main]]
+  identifier = "docs"
+  name = "補助ドキュメント"
+  pageRef = "/docs"
+  weight = 2
+
+[[menu.main]]
+  identifier = "github"
+  name = "GitHub"
+  url = "https://github.com/gracefulm/go-mtls-tcp"
+  weight = 99
+  [menu.main.params]
+    icon = "github"
+
+[module]
+  [[module.imports]]
+    path = "github.com/imfing/hextra"
+
+  # Top page: repository root README.md
+  [[module.mounts]]
+    source = "../README.md"
+    target = "content/_index.md"
+
+  # docs/ → /docs/...
+  [[module.mounts]]
+    source = "../docs"
+    target = "content/docs"
+
+  # scripts/README.md → /scripts/
+  [[module.mounts]]
+    source = "../scripts/README.md"
+    target = "content/scripts/_index.md"
+
+  # tutorial steps: each README.md becomes the section landing
+  [[module.mounts]]
+    source = "../tutorial/step01-tcp-echo/README.md"
+    target = "content/tutorial/step01-tcp-echo/_index.md"
+
+  [[module.mounts]]
+    source = "../tutorial/step02-tls/README.md"
+    target = "content/tutorial/step02-tls/_index.md"
+
+  [[module.mounts]]
+    source = "../tutorial/step02-tls/tls-dump.txt"
+    target = "static/tutorial/step02-tls/tls-dump.txt"
+
+  [[module.mounts]]
+    source = "../tutorial/step03-mtls/README.md"
+    target = "content/tutorial/step03-mtls/_index.md"
+
+  [[module.mounts]]
+    source = "../tutorial/step03-mtls/mtls-dump.txt"
+    target = "static/tutorial/step03-mtls/mtls-dump.txt"
+
+  [[module.mounts]]
+    source = "../tutorial/step04-envoy-mtls/README.md"
+    target = "content/tutorial/step04-envoy-mtls/_index.md"
+
+  # Site-local overrides
+  [[module.mounts]]
+    source = "content"
+    target = "content"
+  [[module.mounts]]
+    source = "layouts"
+    target = "layouts"

@@ -28,3 +28,18 @@ sec:
 test: lint fmt
 	@echo "> testing go files..."
 	go test -race -cover ./...
+
+.PHONY: site-deps
+site-deps:
+	@echo "> resolving hugo modules..."
+	cd site && hugo mod get github.com/imfing/hextra@latest && hugo mod tidy
+
+.PHONY: site-serve
+site-serve: site-deps
+	@echo "> hugo server (http://localhost:1313)..."
+	cd site && hugo server -D
+
+.PHONY: site-build
+site-build: site-deps
+	@echo "> building static site into site/public..."
+	cd site && hugo --minify

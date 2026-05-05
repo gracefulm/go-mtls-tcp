@@ -57,6 +57,24 @@ echo: hello
 4. 鍵交換 → 共通鍵を作って暗号化セッション開始。
 5. 以降のアプリケーションデータは AES などの共通鍵暗号で暗号化される。
 
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant S as Server
+
+    Note over C,S: TCP 3-way ハンドシェイク
+    C->>S: SYN (seq=x)
+    S->>C: SYN+ACK (seq=y, ack=x+1)
+    C->>S: ACK (ack=y+1)
+    Note over C,S: ESTABLISHED
+
+    Note over C,S: TLS ハンドシェイク
+    C->>S: ClientHello
+    S->>C: ServerHello, Certificate
+    C->>S: (鍵交換)
+    Note over C,S: 暗号化セッション確立
+```
+
 ここまでを通ると、Step01 にあった「盗聴」「改ざん」「サーバーのなりすまし」が解決されます。
 
 ## 観察ポイント (実験してみよう)
@@ -107,7 +125,6 @@ connection closed by server            ← サーバーが即座に切断する
 
 > これは意図的な設計です。「TLS ポートで平文を受け入れてしまう」という脆弱性を防ぐため、TLS サーバーは TLS 以外の通信を一切受け付けません。ブラウザで `https://` のサイトにポート 443 で `http://` として繋ごうとしたときに接続が切られるのと同じ仕組みです。
 
-
 ### 4. openssl でも検証してみる
 
 ```bash
@@ -115,6 +132,10 @@ openssl s_client -connect localhost:9443 -CAfile tutorial/step02-tls/certs/ca.cr
 ```
 
 `Verify return code: 0 (ok)` と出れば、Go のクライアントと同じ理屈で検証が通っています。出力末尾の `Server certificate` セクションで SAN が確認できます。
+
+## パケットダンプ
+
+`tcpdump` で実際に観測した本ステップのハンドシェイクを [`tls-dump.txt`](tls-dump.txt) に置いてあります。`ClientHello` / `ServerHello` / `Certificate` などのレコードがどう流れているか、生のバイト列で確認できます。
 
 ## 用語ミニまとめ
 

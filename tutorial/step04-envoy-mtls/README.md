@@ -10,13 +10,22 @@
 
 ## 構成図
 
-```
-ターミナル B                ┌── compose ネットワーク (ターミナル A) ──────────────┐
-                            │                                                       │
-[Go client (host)] --:9445--┼─> [ envoy ] --mTLS:9444--> [ server (Step03 無改変) ] │
-                            │       │                                               │
-                            │       └── admin :9901 (host へ公開)                    │
-                            └───────────────────────────────────────────────────────┘
+```mermaid
+graph LR
+    subgraph host["ホスト (ターミナル B)"]
+        client["Go client\n(go run)"]
+    end
+
+    subgraph compose["compose ネットワーク (ターミナル A)"]
+        envoy["envoy\n(envoyproxy/envoy)"]
+        server["server\n(Step03 無改変)"]
+    end
+
+    admin["admin\n:9901"]
+
+    client -- "平文 TCP\n:9445" --> envoy
+    envoy -- "mTLS\n:9444" --> server
+    envoy -. "host へ公開" .-> admin
 ```
 
 - **クライアント**: ホスト側で `go run`。`localhost:9445` に **平文 TCP** で繋ぐだけ。`crypto/tls` も `crypto/x509` も import しない。

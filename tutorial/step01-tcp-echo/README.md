@@ -39,16 +39,16 @@ echo: hello
 
 `net.Dial` が返ってくる時点で、実は OS カーネルどうしが3つのパケットをやり取りしています。
 
-```
-クライアント                                   サーバー
-   |                                              |
-   | --- SYN  (seq=x) ---------------------->     |   "繋ぎたい"
-   |                                              |
-   |     <-- SYN+ACK  (seq=y, ack=x+1) ---------- |   "OK、こちらも準備した"
-   |                                              |
-   | --- ACK  (ack=y+1) -------------------->     |   "了解、確立"
-   |                                              |
-   |        ESTABLISHED ←→ ESTABLISHED            |
+```mermaid
+sequenceDiagram
+    participant C as クライアント
+    participant S as サーバー
+
+    C->>S: SYN (seq=x) ／ 「繋ぎたい」
+    S->>C: SYN+ACK (seq=y, ack=x+1) ／ 「OK、こちらも準備した」
+    C->>S: ACK (ack=y+1) ／ 「了解、確立」
+
+    Note over C,S: ESTABLISHED ←→ ESTABLISHED
 ```
 
 各端の状態遷移は次のとおりです。

@@ -37,25 +37,18 @@ Envoy の発想は **「外出し」** です。アプリは平文 HTTP / TCP �
 
 Step 04 で扱ったものを再整理して、L7 (HTTP) の概念も含めて並べます。
 
-```
-                       [ listener (:9445) ]
-                              │
-                       [ filter chain ]
-                              │
-         ┌─ TCP の場合 ──────┴──────── HTTP の場合 ─┐
-         │                                            │
-   tcp_proxy filter                          http_connection_manager
-         │                                            │
-         │                                  [ route_config ]
-         │                                            │
-         └────────── cluster ←──────────────┘
-                       │
-                  [ endpoint(s) ]   ← 上流の host:port 群
-                       │
-                  transport_socket  ← TLS 設定はここに付く
-                       │
-                       ▼
-                   上流サーバー
+```mermaid
+flowchart TD
+    L["listener (:9445)"]
+    L --> FC["filter chain"]
+    FC -->|TCP の場合| TP["tcp_proxy filter"]
+    FC -->|HTTP の場合| HCM["http_connection_manager"]
+    HCM --> RC["route_config"]
+    TP --> CL["cluster"]
+    RC --> CL
+    CL --> EP["endpoint(s)\n上流の host:port 群"]
+    EP --> TS["transport_socket\nTLS 設定はここに付く"]
+    TS --> US["上流サーバー"]
 ```
 
 ### コアな単語

@@ -81,3 +81,13 @@ make certs
 | [04-certificate-flow.md](docs/04-certificate-flow.md) | CA・デジタル署名・証明書の発行フロー |
 | [05-tls-versions.md](docs/05-tls-versions.md) | TLS 1.2 と 1.3 のハンドシェイクフロー比較 |
 | [06-envoy.md](docs/06-envoy.md) | Envoy 概論・sidecar 化のメリット/デメリット・他製品比較 |
+
+## Web で読む
+
+このリポジトリの内容は GitHub Pages 上でも公開されています（`main` への push で自動デプロイ）。
+
+- 公開URL: https://gracefulm.github.io/go-mtls-tcp/
+- ローカルプレビュー: [Hugo extended](https://gohugo.io/installation/) を入れた上で `make site-serve` → http://localhost:1313/
+- 静的サイトビルド: `make site-build`（`site/public/` に出力）
+
+サイトの仕組みは `site/`（Hugo プロジェクト）と `.github/workflows/pages.yml` を参照してください。初回のみ、リポジトリ Settings → Pages → **Source: GitHub Actions** に切り替える必要があります。

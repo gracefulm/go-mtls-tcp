@@ -32,20 +32,23 @@ Go の `net` / `crypto/tls` / `crypto/x509` パッケージだけを使って、
     - [Step 01 — 素の TCP エコー](../tutorial/step01-tcp-echo/README.md)
     - [Step 02 — TLS (サーバー認証のみ)](../tutorial/step02-tls/README.md)
     - [Step 03 — mTLS (相互認証)](../tutorial/step03-mtls/README.md)
+    - [Step 04 — Envoy を sidecar にして mTLS を肩代わり](../tutorial/step04-envoy-mtls/README.md)
 
 3. 詰まったら本ドキュメントの **用語集** に戻ってきてください。
 
 ## 補助資料
 
 - [tcpdump — 基本的な使い方](01-tcpdump.md): 各ステップで実際に流れるバイト列を観察するための入門。Step 01 で平文が丸見えになる様子、Step 02 / 03 でTLS化後に暗号化される様子を比較できます。
+- [Envoy 概論 — sidecar 化のメリット・デメリットと他製品比較](06-envoy.md): Step 04 の周辺知識。なぜ Envoy なのか、sidecar 化で何が嬉しくて何が痛いか、Istio / Linkerd / nginx / Traefik など他製品との位置づけ。
 
 ## 各ステップの早見表
 
-| Step | 目的 | 増えるもの (`tls.Config`) | 解決される脅威 |
+| Step | 目的 | 増えるもの | 解決される / 学べること |
 |---|---|---|---|
 | 01 | TCP の素の挙動 | (TLS なし) | — |
-| 02 | サーバー認証 TLS | `Certificates` (サーバー側), `RootCAs` / `ServerName` (クライアント側) | 盗聴・改ざん・サーバーのなりすまし |
-| 03 | mTLS | `ClientCAs` / `ClientAuth` (サーバー側), `Certificates` (クライアント側) | クライアントのなりすまし |
+| 02 | サーバー認証 TLS | `tls.Config`: `Certificates` (サーバー側), `RootCAs` / `ServerName` (クライアント側) | 盗聴・改ざん・サーバーのなりすまし |
+| 03 | mTLS | `tls.Config`: `ClientCAs` / `ClientAuth` (サーバー側), `Certificates` (クライアント側) | クライアントのなりすまし |
+| 04 | Envoy sidecar で mTLS を肩代わり | Envoy YAML: `listener` / `cluster` / `transport_socket` (`UpstreamTlsContext`) / `admin` | アプリから TLS 設定を剥がす / Envoy の基本構成 |
 
 ## 用語集 (アルファベット順)
 

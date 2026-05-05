@@ -1,0 +1,37 @@
+# Step04: Envoy + Step03 サーバーを Docker Compose で同時に立ち上げる。
+#
+# クライアントだけはホスト側に残す (stdin 対話入力するため)。
+#
+# 構図:
+#   [Go client (host)] --plaintext:9445--> [envoy] --mTLS--> [server] (どちらも compose ネットワーク内)
+#
+# repo root から起動:
+#   docker compose -f tutorial/step04-envoy-mtls/compose.yaml up
+# あるいは:
+#   cd tutorial/step04-envoy-mtls && docker compose up
+
+services:
+  # Step03 の mTLS サーバーを「ソース無改変」のまま動かす。
+  # Dockerfile を作らず、golang:1.26-alpine にリポジトリを read-only でバインドして
+  # `go run` する手抜き構成。Step03 server は標準ライブラリのみで外部依存なしなので
+  # モジュールダウンロードも発生しない。
+  server:
+    image: golang:1.26-alpine
+    working_dir: /repo
+    volumes:
+      - ../..:/repo:ro                      # repo root を read-only バインド
+    command: ["go", "run", "./tutorial/step03-mtls/server"]
+    # コンテナ内の :9444 で listen する。
+    # compose ネットワーク内では他サービスから "server:9444" で名前解決される。
+
+  envoy:
+    image: envoyproxy/envoy:v1.33-latest
+    depends_on:
+      - server                              # コンテナ「起動」順だけ揃える (ready は待たない)
+    ports:
+      - "9445:9445"                         # ホスト → envoy listener (Go client が叩く)
+      - "9901:9901"                         # ホスト → envoy admin API
+    volumes:
+      - ../step03-mtls/certs:/certs:ro      # Step03 の証明書をそのまま再利用
+      - ./envoy/envoy.yaml:/etc/envoy/envoy.yaml:ro
+    command: ["-c", "/etc/envoy/envoy.yaml", "--log-level", "info"]

@@ -1,0 +1,77 @@
+# Step04: Envoy を egress sidecar として使い、平文 TCP を mTLS に変換する設定。
+#
+# 流れ:
+#   [Go client] --(plaintext)-->  Envoy :9445  --(mTLS)--> Go server :9444
+#
+# Envoy の主要な構成要素:
+#   - listener        : 接続を受ける入口 (今回は :9445)
+#   - filter chain    : 受けた接続をどう処理するか (今回は L4 TCP プロキシ)
+#   - cluster         : 上流 (= 転送先) の論理グループ
+#   - endpoint        : cluster の中の実体 (host:port)
+#   - transport_socket: cluster との間の暗号化方式 (今回は mTLS の起点側)
+#   - admin           : 統計や設定ダンプを覗くための管理ポート (:9901)
+
+admin:
+  address:
+    socket_address:
+      address: 0.0.0.0
+      port_value: 9901
+
+static_resources:
+  listeners:
+    - name: tcp_listener
+      address:
+        socket_address:
+          address: 0.0.0.0
+          port_value: 9445
+      filter_chains:
+        - filters:
+            # L4 透過プロキシ: 受け取ったバイト列をそのまま cluster に流す。
+            # echo は HTTP ではないので L7 (envoy.filters.network.http_connection_manager) は使わない。
+            - name: envoy.filters.network.tcp_proxy
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
+                stat_prefix: mtls_egress
+                cluster: mtls_upstream
+
+  clusters:
+    - name: mtls_upstream
+      type: STATIC
+      connect_timeout: 1s
+      load_assignment:
+        cluster_name: mtls_upstream
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      # Docker compose の同ネットワーク内サービス名。
+                      # 組み込み DNS が "server" を server コンテナの IP に解決する。
+                      # (host.docker.internal を使っていた頃と違い、ホスト側を経由しない)
+                      address: server
+                      port_value: 9444
+      # ↓ ここが mTLS の「クライアント側」設定。Step03 client/main.go と等価な役割。
+      transport_socket:
+        name: envoy.transport_sockets.tls
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
+          # SNI: Step03 server の証明書 SAN は localhost なのでこれを送る (= tls.Config.ServerName 相当)。
+          sni: localhost
+          common_tls_context:
+            # 自分 (= Envoy) が提示する「クライアント証明書」。
+            # Step03 client が tls.Config.Certificates に渡していたのと同じファイル。
+            tls_certificates:
+              - certificate_chain:
+                  filename: /certs/client.crt
+                private_key:
+                  filename: /certs/client.key
+            # サーバー証明書を検証するための CA (= tls.Config.RootCAs 相当)。
+            validation_context:
+              trusted_ca:
+                filename: /certs/ca.crt
+              # サーバー証明書の SAN が DNS=localhost を含むことを確認する。
+              # Go 1.15+ と同じく CN ベース検証はしない。
+              match_typed_subject_alt_names:
+                - san_type: DNS
+                  matcher:
+                    exact: localhost

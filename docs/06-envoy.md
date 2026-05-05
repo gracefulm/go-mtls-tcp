@@ -150,23 +150,24 @@ Step 03 のクライアントで `tls.Config` を組み立てていた責任が�
 
 ## 8. 他のプロキシとの比較
 
-L4/L7 プロキシは Envoy だけではありません。
+L4/L7 プロキシは Envoy だけではありません。本チュートリアルが扱っているのは **TCP (L4) レイヤの mTLS** なので、各製品が L4 mTLS をどこまでサポートしているかも観点に入れて比較します。
 
-| プロダクト | 言語 | 強み | 弱み (Envoy 比) |
-|---|---|---|---|
-| **Envoy** | C++ | 動的設定 (xDS), 観測性, gRPC/HTTP3 完備, 機能の豊富さ | 設定の複雑さ, リソース消費 |
-| **nginx** | C | シンプルさ, 圧倒的な実績, 静的ファイル配信が得意 | 動的設定が弱い (要再起動 or nginx Plus), gRPC は限定的 |
-| **HAProxy** | C | L4 性能が極めて高い, TCP プロキシの古典的決定版 | L7 機能は限定的, 動的設定は HAProxy Enterprise 中心 |
-| **Traefik** | Go | Kubernetes Ingress に強い, ラベル/アノテーションで自動構成, 学習コストが低い | パフォーマンスは Envoy/nginx より落ちる, mesh 的な使い方は弱い |
-| **Caddy** | Go | 自動 HTTPS (Let's Encrypt 統合), 設定が短い | 機能の幅が狭い, mesh 用途は想定外 |
-| **linkerd-proxy** | Rust | Linkerd 専用, 軽量 (Envoy の 1/3 程度のメモリ), HTTP/2 と gRPC に特化 | Linkerd の外では使えない, 機能が限定 (RBAC や WASM フィルタはない) |
-| **AWS ALB / NLB** | (managed) | 運用ゼロ | 機能が固定, mesh の sidecar には使えない |
+| プロダクト | 言語 | 強み | 弱み (Envoy 比) | L4 mTLS 対応 |
+|---|---|---|---|---|
+| **Envoy** | C++ | 動的設定 (xDS), 観測性, gRPC/HTTP3 完備, 機能の豊富さ | 設定の複雑さ, リソース消費 | ◎ `tcp_proxy` + `transport_socket` (`Downstream/UpstreamTlsContext`) で双方向検証。SNI 単位の filter chain 振り分けも可能。Step 04 で実演済み |
+| **nginx** | C | シンプルさ, 圧倒的な実績, 静的ファイル配信が得意 | 動的設定が弱い (要再起動 or nginx Plus), gRPC は限定的 | ○ `stream` モジュール (1.9+) で TCP/UDP プロキシ。`ssl_verify_client on` + `ssl_client_certificate` でクライアント検証可能 |
+| **HAProxy** | C | L4 性能が極めて高い, TCP プロキシの古典的決定版 | L7 機能は限定的, 動的設定は HAProxy Enterprise 中心 | ◎ `mode tcp` + `bind ... ssl ca-file ... verify required` で完備。L4 mTLS の用途では最も実績が長い部類 |
+| **Traefik** | Go | Kubernetes Ingress に強い, ラベル/アノテーションで自動構成, 学習コストが低い | パフォーマンスは Envoy/nginx より落ちる, mesh 的な使い方は弱い | ○ v2 以降の `TCP routers` + `TLSOption.clientAuth` で対応。HTTP 側ほどドキュメントは厚くない |
+| **Caddy** | Go | 自動 HTTPS (Let's Encrypt 統合), 設定が短い | 機能の幅が狭い, mesh 用途は想定外 | △ 本体は HTTP 中心。L4 全般はコミュニティ製の [`caddy-l4`](https://github.com/mholt/caddy-l4) プラグイン経由 (mTLS も可能だがサードパーティ依存) |
+| **linkerd-proxy** | Rust | Linkerd 専用, 軽量 (Envoy の 1/3 程度のメモリ), HTTP/2 と gRPC に特化 | Linkerd の外では使えない, 機能が限定 (RBAC や WASM フィルタはない) | △ HTTP/2/gRPC 前提の identity ベース mTLS。生 TCP も中継はできるが、汎用 L4 mTLS プロキシとして使う想定ではない |
+| **AWS ALB / NLB** | (managed) | 運用ゼロ | 機能が固定, mesh の sidecar には使えない | △ ALB は L7 のみで mTLS は HTTPS リスナー限定 (2023 年追加)。NLB は TLS 終端は可能だが**クライアント証明書検証は未サポート** (透過 pass-through なら可) |
 
 ざっくりした使い分け:
 
 - **エッジで TLS 終端だけしたい** → nginx / Traefik / Caddy で十分なことが多い。
 - **ゲートウェイで API 認証 / レート制限 / トランスフォームをやりたい** → Envoy ベースのゲートウェイ (Gloo, Emissary, Contour, Envoy Gateway) または Kong。
 - **マイクロサービス間で mTLS / retry / observability を統一したい** → Envoy sidecar (= Istio / Consul) または Linkerd。
+- **任意の TCP プロトコル (Postgres / Redis / 独自バイナリ) に mTLS を被せたい** → Envoy `tcp_proxy` か HAProxy `mode tcp`。HTTP 前提のプロキシ (Caddy / Traefik / ALB) は外す。
 - **HFT / 数 µs のレイテンシが死活問題** → どれも避ける (アプリ内蔵 or DPDK/eBPF 直書き)。
 
 ## 9. Service mesh 製品の比較

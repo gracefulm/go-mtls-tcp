@@ -208,6 +208,22 @@ curl -s 'localhost:9901/stats?filter=mtls_upstream.*ssl' | head
 # 例: cluster.mtls_upstream.ssl.handshake: 1
 ```
 
+**実際に envoy ↔ server 区間のパケットを Wireshark で見る**
+
+「`tcpdump -i lo0` では捕まえられない」のは、compose ネットワークが **コンテナの network namespace に閉じている** ためです。サーバーコンテナの netns に **サイドカーで間借り** すれば、その `eth0` をそのままキャプチャできます。macOS の Docker Desktop でも同じ手順が通ります (ホストから docker bridge は見えませんが、コンテナの中に潜り込めば中の NIC は触れます)。
+
+```bash
+# サーバーコンテナの netns を共有し、tcpdump で pcap を吐く
+# (コンテナ名は `docker compose ps` で確認。プロジェクト名次第で末尾の番号が変わる)
+docker run --rm --net container:step04-envoy-mtls-server-1 \
+    -v "$PWD":/out nicolaka/netshoot \
+    tcpdump -i eth0 -s 0 -w /out/inter.pcap 'tcp port 9444'
+```
+
+`nicolaka/netshoot` は `tcpdump` / `tshark` / `dig` などが同梱された診断用イメージで、サーバー/Envoy のイメージには何も足さずに済みます。別ターミナルでクライアント (`go run ./tutorial/step04-envoy-mtls/client`) を 1 往復走らせ、`Ctrl-C` で `tcpdump` を止めると、カレントディレクトリに `inter.pcap` ができます。ホストの Wireshark で開けば、`ClientHello` から始まる TLS ハンドシェイクと、その後に続く暗号化済み `Application Data` が見えます (Step02/03 の `tls-dump.txt` と同じ形)。
+
+仕組みのキモは `--net container:<name>`。これは **「指定コンテナと同じ netns で新しいプロセスを起こす」** Docker のフラグで、Linux の `setns(2)` をラップしたものです。Pod 内サイドカーで `localhost` がアプリと共有される話と同じ仕組みで、Step 04 の sidecar パターンの理解そのものを実演する観察方法でもあります。
+
 ポイントは **「プロセス境界 (= compose 内 envoy ↔ server コンテナ) を跨いだ瞬間に暗号化される」** こと。実環境では平文 listener (`:9445`) はループバックや Unix domain socket に閉じ込め、外に出さないのが定石です。
 
 ### 2. compose ネットワークの DNS で `server` が引けることを確認

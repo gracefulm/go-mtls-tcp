@@ -36,7 +36,7 @@ static_resources:
 
   clusters:
     - name: mtls_upstream
-      type: STATIC
+      type: STRICT_DNS
       connect_timeout: 1s
       load_assignment:
         cluster_name: mtls_upstream

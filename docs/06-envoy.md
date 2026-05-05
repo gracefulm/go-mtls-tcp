@@ -6,7 +6,7 @@ Step 04 の README は「動かすための最小設定」だけに絞ってあ�
 
 ## 1. Envoy とは
 
-**Envoy** は、Lyft が 2016 年に OSS 公開し、現在は **CNCF の Graduated プロジェクト** になっている **L4/L7 プロキシ** です。
+**[Envoy](https://www.envoyproxy.io/docs/envoy/latest/)** は、Lyft が 2016 年に OSS 公開し、現在は **CNCF の Graduated プロジェクト** になっている **L4/L7 プロキシ** です。
 
 ひとことで言うなら、「**ネットワーク I/O の責任をアプリから剥がして、独立したプロセスに集約するための高機能プロキシ**」です。
 

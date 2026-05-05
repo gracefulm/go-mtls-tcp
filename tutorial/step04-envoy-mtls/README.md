@@ -132,7 +132,7 @@ listeners:
 ```yaml
 clusters:
   - name: mtls_upstream
-    type: STATIC
+    type: STRICT_DNS
     load_assignment:
       endpoints:
         - lb_endpoints:
@@ -142,6 +142,10 @@ clusters:
 `cluster` は「同じ役割の上流ホストの集合」を表す Envoy の単位です。今回はエンドポイントが 1 つだけ (Step03 サーバー)。複数ある場合はここで負荷分散の対象になります。
 
 `address: server` は **`compose.yaml` の `services.server` という名前** を Docker の組み込み DNS が解決します。Kubernetes における Service 名による DNS と同じ発想で、IP を直接書かないので Pod/コンテナの再起動で IP が変わっても追従します。
+
+> **`type: STRICT_DNS` にする理由**  
+> `type: STATIC` は address にリテラルの IP アドレスしか受け付けません。`server` のようなホスト名を指定すると "malformed IP address" エラーで起動に失敗します。  
+> `STRICT_DNS` にすると Envoy が DNS を引いて IP に解決するため、compose ネットワーク内の `server` サービス名が正しく使えます。
 
 ### `transport_socket` — 上流との間の暗号化
 

@@ -15,7 +15,12 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 WORK_DIR="$(mktemp -d)"
-trap 'rm -rf "$WORK_DIR"' EXIT
+cleanup() {
+    [[ -n "${WORK_DIR:-}" && -d "$WORK_DIR" ]] || return 0
+    find "$WORK_DIR" -mindepth 1 -delete
+    rmdir "$WORK_DIR"
+}
+trap cleanup EXIT
 
 STEP02_DIR="$ROOT_DIR/tutorial/step02-tls/certs"
 STEP03_DIR="$ROOT_DIR/tutorial/step03-mtls/certs"

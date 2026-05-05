@@ -54,6 +54,10 @@ Go の `net` / `crypto/tls` / `crypto/x509` パッケージだけを使い、**�
 ## セットアップ
 
 ```bash
+# リポジトリをクローン
+git clone https://github.com/gracefulm/go-mtls-tcp.git
+cd go-mtls-tcp
+
 # Git のコミットテンプレートを設定
 make init
 

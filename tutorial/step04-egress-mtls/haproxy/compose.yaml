@@ -1,0 +1,40 @@
+# Step04 (HAProxy 版): HAProxy + Step03 サーバーを Docker Compose で同時に立ち上げる。
+#
+# 構図:
+#   [Go client (host)] --plaintext:9445--> [haproxy] --mTLS--> [server] (どちらも compose ネットワーク内)
+#
+# Envoy 版とホストポート (:9445) を共有しているので、両者を **同時に起動しない** こと。
+#
+# repo root から起動:
+#   docker compose -f tutorial/step04-egress-mtls/haproxy/compose.yaml up
+# あるいは:
+#   cd tutorial/step04-egress-mtls/haproxy && docker compose up
+
+# プロジェクト名を明示しておく (envoy 版と区別しつつ、コンテナ名を安定させる)。
+name: step04-egress-mtls-haproxy
+
+services:
+  # Step03 の mTLS サーバーを「ソース無改変」のまま動かす (envoy/compose.yaml と同一)。
+  server:
+    image: golang:1.26-alpine
+    working_dir: /repo
+    volumes:
+      - ../../..:/repo:ro                   # repo root を read-only バインド
+    command: ["go", "run", "./tutorial/step03-mtls/server"]
+
+  haproxy:
+    image: haproxy:2.9-alpine
+    depends_on:
+      - server
+    ports:
+      - "9445:9445"                         # ホスト → haproxy frontend (Go client が叩く)
+    volumes:
+      - ../../step03-mtls/certs:/certs-ro:ro                   # Step03 の証明書をそのまま再利用
+      - ./haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+    # HAProxy の `crt` は「証明書+秘密鍵」を連結した PEM を要求するので、
+    # 起動直前に entrypoint で連結ファイルを書き出してから haproxy 本体を exec する。
+    # `-W -db` は haproxy 公式イメージの既定と同じ (master-worker + foreground)。
+    entrypoint:
+      - sh
+      - -c
+      - cat /certs-ro/client.crt /certs-ro/client.key > /tmp/client.pem && exec haproxy -W -db -f /usr/local/etc/haproxy/haproxy.cfg

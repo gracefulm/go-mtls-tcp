@@ -111,8 +111,8 @@ enableInlineShortcodes = true
     target = "static/tutorial/step03-mtls/mtls-dump.txt"
 
   [[module.mounts]]
-    source = "../tutorial/step04-envoy-mtls/README.md"
-    target = "content/tutorial/step04-envoy-mtls/_index.md"
+    source = "../tutorial/step04-egress-mtls/README.md"
+    target = "content/tutorial/step04-egress-mtls/_index.md"
 
   # Site-local overrides
   [[module.mounts]]

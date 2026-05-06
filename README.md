@@ -9,7 +9,7 @@ Go の `net` / `crypto/tls` / `crypto/x509` パッケージだけを使い、**�
 | [Step 01](tutorial/step01-tcp-echo/README.md) | 素の TCP エコー | — |
 | [Step 02](tutorial/step02-tls/README.md) | TLS（サーバー認証のみ） | 盗聴・改ざん・サーバーのなりすまし |
 | [Step 03](tutorial/step03-mtls/README.md) | mTLS（相互認証） | クライアントのなりすまし |
-| [Step 04](tutorial/step04-envoy-mtls/README.md) | Envoy を sidecar にして mTLS を肩代わり | アプリから TLS 設定を剥がす / Envoy の基本 (listener / cluster / transport_socket / admin) |
+| [Step 04](tutorial/step04-egress-mtls/README.md) | Egress sidecar で mTLS を肩代わり (Envoy / HAProxy) | アプリから TLS 設定を剥がす / Envoy の基本 (listener / cluster / transport_socket / admin) と HAProxy (`mode tcp` + `server ... ssl crt ca-file verify required`) の対応 |
 
 ## プロジェクトの構成
 
@@ -41,10 +41,14 @@ Go の `net` / `crypto/tls` / `crypto/x509` パッケージだけを使い、**�
 │   │   ├── client/main.go
 │   │   ├── certs/                 #   make certs で生成される証明書
 │   │   └── README.md
-│   └── step04-envoy-mtls/         # Step 04: Envoy を sidecar にして mTLS を肩代わり
-│       ├── client/main.go         #   平文 TCP しか喋らないクライアント (ホスト側)
-│       ├── envoy/envoy.yaml       #   Envoy の静的設定
-│       ├── compose.yaml           #   Envoy + Step03 サーバーを compose で同居
+│   └── step04-egress-mtls/        # Step 04: Egress sidecar で mTLS を肩代わり (Envoy / HAProxy)
+│       ├── client/main.go         #   平文 TCP しか喋らないクライアント (ホスト側、両 proxy 共通)
+│       ├── envoy/                 #   Envoy 版 (本編で詳説)
+│       │   ├── envoy.yaml         #     Envoy の静的設定
+│       │   └── compose.yaml       #     Envoy + Step03 サーバーを compose で同居
+│       ├── haproxy/               #   HAProxy 版 (Envoy 版との対応表で把握する補助構成)
+│       │   ├── haproxy.cfg        #     HAProxy の設定 (mode tcp + server ssl crt ca-file verify)
+│       │   └── compose.yaml       #     HAProxy + Step03 サーバーを compose で同居
 │       └── README.md
 ├── go.mod
 ├── Makefile

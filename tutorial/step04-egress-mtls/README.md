@@ -1,12 +1,13 @@
-# Step 04 — Envoy を sidecar にして mTLS を肩代わりさせる
+# Step 04 — Egress sidecar で mTLS を肩代わりさせる (Envoy / HAProxy)
 
 ## ゴール
 
-- アプリ (Go クライアント) から TLS コードを **すべて剥がし**、平文 TCP で Envoy に喋らせる。
-- Envoy 側で **クライアント証明書を提示する mTLS の起点 (originate)** を構成する。
+- アプリ (Go クライアント) から TLS コードを **すべて剥がし**、平文 TCP で sidecar プロキシに喋らせる。
+- プロキシ側で **クライアント証明書を提示する mTLS の起点 (originate)** を構成する。
+- 同じ構図を **Envoy** と **HAProxy** の 2 通りで動かし、L4 mTLS sidecar の設定が製品によってどう書き分けられるかを比べる。
 - Envoy の主要構成要素 (`listener` / `filter chain` / `cluster` / `endpoint` / `transport_socket` / `admin`) を、最小の YAML を読みながら把握する。
 
-実運用の service mesh (Istio / Linkerd) が「アプリの隣に sidecar を立てて mTLS を肩代わりさせる」のと同じ構図を、ローカルで一番小さく再現します。
+実運用の service mesh (Istio / Linkerd) が「アプリの隣に sidecar を立てて mTLS を肩代わりさせる」のと同じ構図を、ローカルで一番小さく再現します。**本編は Envoy 版を中心に解説**し、HAProxy 版は末尾の節で「同じことを HAProxy で書くとどうなるか」を設定対応表とともに示します。
 
 ## 構成図
 
@@ -17,23 +18,25 @@ graph LR
     end
 
     subgraph compose["compose ネットワーク (ターミナル A)"]
-        envoy["envoy\n(envoyproxy/envoy)"]
+        proxy["envoy または haproxy\n(片方だけ起動)"]
         server["server\n(Step03 無改変)"]
     end
 
-    admin["admin\n:9901"]
+    admin["envoy admin\n:9901 (envoy 版のみ)"]
 
-    client -- "平文 TCP\n:9445" --> envoy
-    envoy -- "mTLS\n:9444" --> server
-    envoy -. "host へ公開" .-> admin
+    client -- "平文 TCP\n:9445" --> proxy
+    proxy -- "mTLS\n:9444" --> server
+    proxy -. "host へ公開" .-> admin
 ```
 
-- **クライアント**: ホスト側で `go run`。`localhost:9445` に **平文 TCP** で繋ぐだけ。`crypto/tls` も `crypto/x509` も import しない。
+- **クライアント**: ホスト側で `go run`。`localhost:9445` に **平文 TCP** で繋ぐだけ。`crypto/tls` も `crypto/x509` も import しない。**Envoy 版・HAProxy 版で同一バイナリ・同一コードを使う** (どちらに繋いでいるかをクライアントは知らない)。
 - **サーバー**: Step03 の `tutorial/step03-mtls/server` を **無改変のまま**、`golang:1.26-alpine` イメージにバインドマウントして `go run` で起動。compose ネットワーク内では `server:9444` で名前解決される。
-- **Envoy**: `envoyproxy/envoy:v1.33-latest` イメージ。上流は `server:9444` (Docker の組み込み DNS が解決)。ホストには `:9445` (listener) と `:9901` (admin) を公開。
-- **証明書**: `tutorial/step03-mtls/certs/` を Envoy にマウントして再利用 (新規生成しない)。
+- **プロキシ**: 以下のどちらか片方を起動する (ホストポート `:9445` を奪い合うので同時起動不可):
+    - **Envoy 版**: `envoyproxy/envoy:v1.33-latest`。`:9445` (listener) と `:9901` (admin) をホストに公開。
+    - **HAProxy 版**: `haproxy:2.9-alpine`。`:9445` (frontend) のみ公開 (admin/stats は本ステップでは未設定)。
+- **証明書**: `tutorial/step03-mtls/certs/` をどちらのプロキシにもマウントして再利用 (新規生成しない)。
 
-Envoy とサーバーが同じ compose ネットワーク内に並ぶ姿は、Kubernetes における **Pod 内 sidecar** の絵にほぼ一致します (Pod 内のコンテナ群が同じ network namespace を共有するのと、compose ネットワークでサービス名解決が効くのは構造的に近い)。
+プロキシとサーバーが同じ compose ネットワーク内に並ぶ姿は、Kubernetes における **Pod 内 sidecar** の絵にほぼ一致します (Pod 内のコンテナ群が同じ network namespace を共有するのと、compose ネットワークでサービス名解決が効くのは構造的に近い)。
 
 ## 前提
 
@@ -52,26 +55,28 @@ docker compose version    # 2.x が出れば OK
 
 | ファイル | 役割 |
 |---|---|
-| `client/main.go` | `:9445` (Envoy) に平文 TCP で繋ぐだけのクライアント (ホスト側で動かす) |
-| `envoy/envoy.yaml` | Envoy の静的設定。listener/cluster/transport_socket/admin |
-| `compose.yaml` | Envoy + Step03 サーバーを 1 ネットワーク内で立ち上げる定義 |
+| `client/main.go` | `:9445` に平文 TCP で繋ぐだけのクライアント (ホスト側で動かす)。Envoy/HAProxy 共通 |
+| `envoy/envoy.yaml` | Envoy の静的設定。listener / cluster / transport_socket / admin |
+| `envoy/compose.yaml` | Envoy + Step03 サーバーを 1 ネットワーク内で立ち上げる定義 |
+| `haproxy/haproxy.cfg` | HAProxy の設定 (`frontend bind` + `backend server ssl crt ca-file verify required`) |
+| `haproxy/compose.yaml` | HAProxy + Step03 サーバーを 1 ネットワーク内で立ち上げる定義。entrypoint で `client.crt` + `client.key` を結合 PEM に変換 |
 
-## 動かす
+## 動かす (Envoy 版)
 
-ターミナルを 2 つ使います。
+ターミナルを 2 つ使います。HAProxy 版の起動方法は本ページ末尾の節を参照。
 
 **ターミナル A — Envoy + サーバーを compose で起動**
 
 リポジトリルートから:
 
 ```bash
-docker compose -f tutorial/step04-envoy-mtls/compose.yaml up
+docker compose -f tutorial/step04-egress-mtls/envoy/compose.yaml up
 ```
 
 または `cd` してから:
 
 ```bash
-cd tutorial/step04-envoy-mtls
+cd tutorial/step04-egress-mtls/envoy
 docker compose up
 ```
 
@@ -89,7 +94,7 @@ envoy-1   | starting main dispatch loop
 リポジトリルートから:
 
 ```bash
-go run ./tutorial/step04-envoy-mtls/client
+go run ./tutorial/step04-egress-mtls/client
 # => connected to localhost:9445 (plaintext) — Envoy will originate mTLS to upstream
 hi
 hello alice@example.com, you said: hi
@@ -101,22 +106,22 @@ hello alice@example.com, you said: hi
 
 ```bash
 # Ctrl-C で compose プロセスを止めるか、別ターミナルから:
-docker compose -f tutorial/step04-envoy-mtls/compose.yaml down
+docker compose -f tutorial/step04-egress-mtls/envoy/compose.yaml down
 ```
 
 ## クライアント側コードの変化
 
 Step03 client と Step04 client を見比べると、`tls.Config` の組み立てと `tls.Dial` がまるごと消えています。
 
-| | Step03 (直接 mTLS) | Step04 (Envoy 経由) |
+| | Step03 (直接 mTLS) | Step04 (sidecar 経由) |
 |---|---|---|
 | import | `crypto/tls`, `crypto/x509` あり | `net` だけ |
-| 鍵/証明書のロード | アプリで `LoadX509KeyPair` | Envoy がファイルから読む |
+| 鍵/証明書のロード | アプリで `LoadX509KeyPair` | プロキシがファイルから読む |
 | 接続呼び出し | `tls.Dial(...)` | `net.Dial("tcp", ...)` |
-| 接続先 | サーバー本体 `:9444` | Envoy のローカル listener `:9445` |
+| 接続先 | サーバー本体 `:9444` | sidecar のローカル listener `:9445` |
 | 行数 (おおよそ) | 70 行強 | 35 行 |
 
-mTLS 設定の責任が **アプリのバイナリ** から **Envoy の YAML** に動いただけで、ネットワーク上で起きていることは Step03 と同じです。
+mTLS 設定の責任が **アプリのバイナリ** から **プロキシの設定ファイル** に動いただけで、ネットワーク上で起きていることは Step03 と同じです (Envoy 版でも HAProxy 版でも違いはない)。
 
 ## Envoy 設定の読み方
 
@@ -210,7 +215,7 @@ sudo tcpdump -i lo0 -A 'tcp port 9445'
 
 ```bash
 # Envoy のログで TLS ハンドシェイクの様子を見る
-docker compose -f tutorial/step04-envoy-mtls/compose.yaml logs envoy | grep -i 'tls\|ssl\|handshake'
+docker compose -f tutorial/step04-egress-mtls/envoy/compose.yaml logs envoy | grep -i 'tls\|ssl\|handshake'
 
 # admin の cluster 統計で "ssl.handshake" が増えていることを確認
 curl -s 'localhost:9901/stats?filter=mtls_upstream.*ssl' | head
@@ -223,13 +228,13 @@ curl -s 'localhost:9901/stats?filter=mtls_upstream.*ssl' | head
 
 ```bash
 # サーバーコンテナの netns を共有し、tcpdump で pcap を吐く
-# (コンテナ名は `docker compose ps` で確認。プロジェクト名次第で末尾の番号が変わる)
-docker run --rm --net container:step04-envoy-mtls-server-1 \
+# (コンテナ名は `docker compose ps` で確認。compose.yaml の name: で固定してある)
+docker run --rm --net container:step04-egress-mtls-envoy-server-1 \
     -v "$PWD":/out nicolaka/netshoot \
     tcpdump -i eth0 -s 0 -w /out/inter.pcap 'tcp port 9444'
 ```
 
-`nicolaka/netshoot` は `tcpdump` / `tshark` / `dig` などが同梱された診断用イメージで、サーバー/Envoy のイメージには何も足さずに済みます。別ターミナルでクライアント (`go run ./tutorial/step04-envoy-mtls/client`) を 1 往復走らせ、`Ctrl-C` で `tcpdump` を止めると、カレントディレクトリに `inter.pcap` ができます。ホストの Wireshark で開けば、`ClientHello` から始まる TLS ハンドシェイクと、その後に続く暗号化済み `Application Data` が見えます (Step02/03 の `tls-dump.txt` と同じ形)。
+`nicolaka/netshoot` は `tcpdump` / `tshark` / `dig` などが同梱された診断用イメージで、サーバー/Envoy のイメージには何も足さずに済みます。別ターミナルでクライアント (`go run ./tutorial/step04-egress-mtls/client`) を 1 往復走らせ、`Ctrl-C` で `tcpdump` を止めると、カレントディレクトリに `inter.pcap` ができます。ホストの Wireshark で開けば、`ClientHello` から始まる TLS ハンドシェイクと、その後に続く暗号化済み `Application Data` が見えます (Step02/03 の `tls-dump.txt` と同じ形)。
 
 仕組みのキモは `--net container:<name>`。これは **「指定コンテナと同じ netns で新しいプロセスを起こす」** Docker のフラグで、Linux の `setns(2)` をラップしたものです。Pod 内サイドカーで `localhost` がアプリと共有される話と同じ仕組みで、Step 04 の sidecar パターンの理解そのものを実演する観察方法でもあります。
 
@@ -240,12 +245,12 @@ docker run --rm --net container:step04-envoy-mtls-server-1 \
 Envoy が `host.docker.internal` を使わずに済んでいる本質は、compose の組み込み DNS にあります。実際に引いてみます:
 
 ```bash
-docker compose -f tutorial/step04-envoy-mtls/compose.yaml exec envoy nslookup server
+docker compose -f tutorial/step04-egress-mtls/envoy/compose.yaml exec envoy nslookup server
 # (envoy イメージに nslookup が無ければ getent でも可)
-docker compose -f tutorial/step04-envoy-mtls/compose.yaml exec envoy getent hosts server
+docker compose -f tutorial/step04-egress-mtls/envoy/compose.yaml exec envoy getent hosts server
 
 # envoy から server コンテナの :9444 が直接見えていることを確認
-docker compose -f tutorial/step04-envoy-mtls/compose.yaml exec envoy nc -zv server 9444 || true
+docker compose -f tutorial/step04-egress-mtls/envoy/compose.yaml exec envoy nc -zv server 9444 || true
 ```
 
 Kubernetes の `Service` 名解決と同じ発想です。Istio/Linkerd で envoy が `productpage:9080` のようなアドレスを使っているのも、根は同じ仕組み。
@@ -278,15 +283,15 @@ mv tutorial/step03-mtls/certs/ca.crt tutorial/step03-mtls/certs/ca.crt.good
 openssl req -x509 -new -nodes -newkey rsa:2048 -days 1 \
     -subj "/CN=Wrong CA" -keyout /tmp/wrong.key -out tutorial/step03-mtls/certs/ca.crt
 
-docker compose -f tutorial/step04-envoy-mtls/compose.yaml restart envoy
-go run ./tutorial/step04-envoy-mtls/client
+docker compose -f tutorial/step04-egress-mtls/envoy/compose.yaml restart envoy
+go run ./tutorial/step04-egress-mtls/client
 # Envoy ログに以下のような行が出る:
 #   TLS error: ...:CERTIFICATE_VERIFY_FAILED
 # クライアントからは TCP は通るが直後に切られる (= Envoy が上流に繋げず断)
 
 # 後始末
 mv tutorial/step03-mtls/certs/ca.crt.good tutorial/step03-mtls/certs/ca.crt
-docker compose -f tutorial/step04-envoy-mtls/compose.yaml restart envoy
+docker compose -f tutorial/step04-egress-mtls/envoy/compose.yaml restart envoy
 ```
 
 `UpstreamTlsContext` の検証は **Step02 で見た RootCAs 検証と完全に同じ** ロジックです (内部的には BoringSSL/OpenSSL の `X509_verify`)。
@@ -296,14 +301,14 @@ docker compose -f tutorial/step04-envoy-mtls/compose.yaml restart envoy
 サーバーコンテナだけ止めてからクライアントを動かしてみます:
 
 ```bash
-docker compose -f tutorial/step04-envoy-mtls/compose.yaml stop server
-go run ./tutorial/step04-envoy-mtls/client
+docker compose -f tutorial/step04-egress-mtls/envoy/compose.yaml stop server
+go run ./tutorial/step04-egress-mtls/client
 # クライアントは接続が即座に切れるか、何も応答せず閉じられる
 # `/clusters` の health 表示も変わる:
 curl -s localhost:9901/clusters | grep mtls_upstream
 
 # 復旧
-docker compose -f tutorial/step04-envoy-mtls/compose.yaml start server
+docker compose -f tutorial/step04-egress-mtls/envoy/compose.yaml start server
 ```
 
 `connect_timeout: 1s` を効かせているので、ハングはしません。
@@ -311,6 +316,70 @@ docker compose -f tutorial/step04-envoy-mtls/compose.yaml start server
 ### 6. 設定をホットリロードする (発展)
 
 Envoy はファイル監視によるホットリロードを直接やらず、**xDS (動的設定 API)** で外部の control plane (Istiod / Consul / 自作) から設定を流し込むのが標準です。本ステップは `static_resources` だけで完結させる最小構成。`xDS` は次のステップの題材になり得ます。
+
+## HAProxy 版で同じことをする
+
+「同じ egress sidecar (= 平文を受けて mTLS で再送) を HAProxy で書くとどうなるか」を最小限で示します。**ホストポート `:9445` を Envoy 版と共有しているので、Envoy 版を起動中なら先に止めてから** HAProxy 版を上げてください。
+
+```bash
+# Envoy 版を起動中なら先に停止
+docker compose -f tutorial/step04-egress-mtls/envoy/compose.yaml down
+
+# HAProxy 版を起動 (ターミナル A)
+docker compose -f tutorial/step04-egress-mtls/haproxy/compose.yaml up
+
+# クライアントは無改修で同じ (ターミナル B)
+go run ./tutorial/step04-egress-mtls/client
+# => connected to localhost:9445 (plaintext) — Envoy will originate mTLS to upstream
+hi
+hello alice@example.com, you said: hi
+
+# 撤収
+docker compose -f tutorial/step04-egress-mtls/haproxy/compose.yaml down
+```
+
+> クライアントが出す `Envoy will originate mTLS ...` は単なるログ文言。実際に mTLS を originate しているのは HAProxy です。サーバー側ログには Envoy 版と同じく `peer CN=alice@example.com` が出ます。
+
+### 設定の主要部分 (`haproxy/haproxy.cfg`)
+
+```haproxy
+frontend plaintext_in
+    bind *:9445
+    default_backend mtls_upstream
+
+backend mtls_upstream
+    server srv1 server:9444 ssl crt /tmp/client.pem ca-file /certs-ro/ca.crt verify required sni str(localhost) verifyhost localhost
+```
+
+`mode tcp` (`defaults` で指定) の `frontend` で平文 TCP を受け、`backend` の `server` 行で **`ssl` を付けたうえでクライアント証明書 (`crt`) と上流検証用 CA (`ca-file`) を渡す**。これだけで egress mTLS が完成します。
+
+`crt /tmp/client.pem` の中身は **証明書 + 秘密鍵を連結した PEM** で、`compose.yaml` の entrypoint で `cat client.crt client.key > /tmp/client.pem` して作っています (HAProxy の `crt` は連結 PEM を要求し、Envoy のように chain と key を別ファイルで指定できないため)。
+
+### Envoy ↔ HAProxy 設定対応表
+
+| 観点 | Envoy (`envoy/envoy.yaml`) | HAProxy (`haproxy/haproxy.cfg`) |
+|---|---|---|
+| 入口 (listener) | `listeners[].address.socket_address` | `frontend ... bind *:9445` |
+| L4 透過プロキシ | `envoy.filters.network.tcp_proxy` フィルタ | `mode tcp` (defaults) |
+| 上流のアドレス | `clusters[].load_assignment ... endpoint.address` | `server srv1 server:9444` |
+| 上流側 TLS の有効化 | `transport_socket: envoy.transport_sockets.tls` (`UpstreamTlsContext`) | `server ... ssl` |
+| 自分が提示するクライアント証明書 | `tls_certificates: [{certificate_chain, private_key}]` (chain と key を別ファイル) | `crt /tmp/client.pem` (連結 PEM 1 ファイル) |
+| 上流サーバー証明書を検証する CA | `validation_context.trusted_ca` | `ca-file /certs-ro/ca.crt` + `verify required` |
+| SNI | `sni: localhost` | `sni str(localhost)` |
+| サーバー証明書のホスト名検証 | `match_typed_subject_alt_names` | `verifyhost localhost` |
+| 上流接続のタイムアウト | `connect_timeout: 1s` | `timeout connect 5s` (defaults) |
+| 動的設定の流儀 | xDS (LDS/CDS/EDS/SDS) | Runtime API + `set ssl cert ...` (本ステップでは未使用) |
+| 管理ポート | `admin :9901` | (本ステップでは公開せず) |
+
+> 「`UpstreamTlsContext` のフィールド」と「`server` 行の SSL オプション」は **意味的にきれいに 1:1 対応** します。L4 mTLS sidecar を書くために本当に必要な情報は **「自分が出す鍵/証明書」「相手を信頼するための CA」「相手のホスト名 (SNI + 検証)」** の 3 つだけ — そこは製品共通のミニマルセットで、残りの差はシンタックスと運用機能 (動的設定・観測・WASM など) の話、というのがこの表の読みどころ。
+
+### 観察実験について
+
+「観察ポイント (実験してみよう)」で書いた 1〜5 (パケット平文確認, compose DNS 名前解決, 別 CA に差し替えて拒否, 上流 down 時の挙動) は、**HAProxy 版でもほぼそのまま試せます**。差分だけ列挙:
+
+- **admin/stats ポートが無い**: Envoy 版で `:9901/stats` や `:9901/clusters` を叩いていた箇所は、HAProxy 版では使えません (本ステップのミニマル設定では stats listener を立てていないため)。代わりに `docker compose -f tutorial/step04-egress-mtls/haproxy/compose.yaml logs haproxy` で接続ログを見ます。
+- **コンテナ名**: netshoot で netns を間借りする実験は、HAProxy 版だと `step04-egress-mtls-haproxy-server-1` が対象になります (envoy 版の `step04-egress-mtls-envoy-server-1` から名前が変わるだけ)。
+- **別 CA に差し替えての拒否**: HAProxy ログに `verify failed: unable to verify the first certificate` 系のエラーが出て backend が `DOWN` になります (Envoy 版と検出される現象自体は同じ)。
 
 ## 用語ミニまとめ
 
@@ -328,6 +397,7 @@ Envoy はファイル監視によるホットリロードを直接やらず、**
 
 - 「mTLS の責任をどこに持たせるか」を、**アプリ内 (Step03)** と **プロセス境界の sidecar (Step04)** の 2 通りで構成できる。
 - Envoy の最小構成 (listener → filter chain → cluster → transport_socket) を YAML から書ける。
+- 同じ egress mTLS sidecar を **HAProxy (`mode tcp` + `server ... ssl crt ca-file verify required`)** でも書けて、Envoy の `UpstreamTlsContext` と 1:1 で対応付けられる。
 - `tls.Config` と `UpstreamTlsContext` のフィールド対応が頭に入った状態で、Istio / Consul Connect / Linkerd など実運用の mesh 設定を読める下地ができる。
 
 ## 注意 (本番運用へ向けて)

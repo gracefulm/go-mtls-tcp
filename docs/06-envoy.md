@@ -1,6 +1,6 @@
 # Envoy 概論 — sidecar 化のメリット・デメリットと他製品比較
 
-このドキュメントでは、[Step 04](../tutorial/step04-envoy-mtls/README.md) で触った **Envoy** について、その立ち位置・基本概念・配置パターン・他製品との比較をまとめます。
+このドキュメントでは、[Step 04](../tutorial/step04-egress-mtls/README.md) で触った **Envoy** について、その立ち位置・基本概念・配置パターン・他製品との比較をまとめます。
 
 Step 04 の README は「動かすための最小設定」だけに絞ってあるので、こちらは「なぜ Envoy なのか」「sidecar にすると何が嬉しくて何が痛いのか」「世の中にどういう選択肢があるのか」を扱います。
 
@@ -248,7 +248,7 @@ gRPC のクライアントライブラリが xDS を直接喋り、Envoy なし�
 
 ## 関連
 
-- [Step 04 — Envoy を sidecar にして mTLS を肩代わり](../tutorial/step04-envoy-mtls/README.md): 本ドキュメントの内容を最小構成で動かす実習。
+- [Step 04 — Egress sidecar で mTLS を肩代わり (Envoy / HAProxy)](../tutorial/step04-egress-mtls/README.md): 本ドキュメントの内容を最小構成で動かす実習。Envoy 版を本編に、同じことを HAProxy で書いた版を末尾の対応表で示している。
 - [Envoy 公式ドキュメント](https://www.envoyproxy.io/docs/envoy/latest/)
 - [xDS REST and gRPC protocol](https://www.envoyproxy.io/docs/envoy/latest/api-docs/xds_protocol)
 - [Istio Ambient Mesh](https://istio.io/latest/docs/ambient/)

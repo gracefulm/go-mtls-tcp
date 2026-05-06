@@ -32,7 +32,7 @@ Go の `net` / `crypto/tls` / `crypto/x509` パッケージだけを使って、
     - [Step 01 — 素の TCP エコー](../tutorial/step01-tcp-echo/README.md)
     - [Step 02 — TLS (サーバー認証のみ)](../tutorial/step02-tls/README.md)
     - [Step 03 — mTLS (相互認証)](../tutorial/step03-mtls/README.md)
-    - [Step 04 — Envoy を sidecar にして mTLS を肩代わり](../tutorial/step04-envoy-mtls/README.md)
+    - [Step 04 — Egress sidecar で mTLS を肩代わり (Envoy / HAProxy)](../tutorial/step04-egress-mtls/README.md)
 
 3. 詰まったら本ドキュメントの **用語集** に戻ってきてください。
 
@@ -48,7 +48,7 @@ Go の `net` / `crypto/tls` / `crypto/x509` パッケージだけを使って、
 | 01 | TCP の素の挙動 | (TLS なし) | — |
 | 02 | サーバー認証 TLS | `tls.Config`: `Certificates` (サーバー側), `RootCAs` / `ServerName` (クライアント側) | 盗聴・改ざん・サーバーのなりすまし |
 | 03 | mTLS | `tls.Config`: `ClientCAs` / `ClientAuth` (サーバー側), `Certificates` (クライアント側) | クライアントのなりすまし |
-| 04 | Envoy sidecar で mTLS を肩代わり | Envoy YAML: `listener` / `cluster` / `transport_socket` (`UpstreamTlsContext`) / `admin` | アプリから TLS 設定を剥がす / Envoy の基本構成 |
+| 04 | Egress sidecar で mTLS を肩代わり (Envoy / HAProxy) | Envoy YAML: `listener` / `cluster` / `transport_socket` (`UpstreamTlsContext`) / `admin`; HAProxy: `mode tcp` + `server ... ssl crt ca-file verify required` | アプリから TLS 設定を剥がす / Envoy と HAProxy で同じ egress mTLS sidecar を書き比べる |
 
 ## 用語集 (アルファベット順)
 

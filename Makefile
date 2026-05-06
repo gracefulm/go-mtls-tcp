@@ -12,7 +12,7 @@ fmt:
 	@echo "> format source code..."
 	go mod tidy
 	go fmt ./...
-	find . -print | grep --regex '.*\.go' | xargs go tool goimports -w -local "github.com/gracefulm/go-template-project"
+	find . -print | grep --regex '.*\.go' | xargs go tool goimports -w -local "github.com/gracefulm/go-mtls-tcp"
 
 .PHONY: lint
 lint:

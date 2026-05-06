@@ -15,7 +15,7 @@ A **hands-on tutorial** for building Go mTLS over TCP, in four runnable steps un
 
 Each step is a **standalone main package** with its own README (Step 04 has only a client; the server is Step 03's, unmodified). Documentation/comments are in Japanese (matches the project README). Entry point for learners: [`docs/00-overview.md`](docs/00-overview.md). The `docs/` directory holds educational reference material (tcpdump, X.509/CA, openssl, certificate flow, TLS 1.2 vs 1.3, Envoy/sidecar concepts) and Step 02/03 each include a captured packet dump (`tls-dump.txt`, `mtls-dump.txt`) for handshake observation.
 
-The Go module path is `github.com/gracefulm/go-template-project` (template origin) — use that for `goimports -local`, not the directory name.
+The Go module path is `github.com/gracefulm/go-mtls-tcp` (template origin) — use that for `goimports -local`, not the directory name.
 
 ## Common commands
 
@@ -24,7 +24,7 @@ All workflows go through the Makefile. Per Go 1.26 `tool` directives in `go.mod`
 ```bash
 make init   # one-time: configures git commit.template -> ./.commit_template
 make certs  # runs scripts/gen-certs.sh — generates CA/server/client certs into each step's certs/
-make fmt    # go mod tidy + go fmt + goimports (-local github.com/gracefulm/go-template-project)
+make fmt    # go mod tidy + go fmt + goimports (-local github.com/gracefulm/go-mtls-tcp)
 make lint   # go tool golangci-lint run
 make sec    # go tool govulncheck ./...
 make test   # runs lint + fmt, then: go test -race -cover ./...

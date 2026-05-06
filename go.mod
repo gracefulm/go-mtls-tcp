@@ -1,4 +1,4 @@
-module github.com/gracefulm/go-template-project
+module github.com/gracefulm/go-mtls-tcp
 
 go 1.26
 
